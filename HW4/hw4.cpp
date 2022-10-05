@@ -1,129 +1,183 @@
 #include <iostream>
 #include <vector>
+#include <iomanip>
 using namespace std;
 
-enum LOCATION { CENTER, LEFT, DOWN, RIGHT, UP };
+#define INF INT32_MAX
 
-struct Node
+int dis[100][100], pos[100][100];
+
+//Initialize the containers
+void initialize(int V, vector<vector<int>> &Matrix, vector<vector<int>> &Position)
 {
-    int value, x, y;
-    Node *L, *D, *R, *U;
-    
-    Node(int _x, int _y, int val);
-};
-
-Node::Node(int _x, int _y, int val)
-{
-    L = D = R = U = NULL;
-    x = _x;
-    y = _y;
-    value = val;
-}
-
-Node* path(vector<vector<int>> &M, int x, int y, int row, int col, int origin)
-{
-    if(x < 0 || x >= col || y < 0 || y >= row)
-		return NULL;
-
-    if (M[x][y] == 0)
-		return NULL;
-
-    Node* ptr = new Node(x, y, M[x][y]);
-
-    if (M[x][y] != -1)
+    for (int i = 0; i < V; i++)
     {
-        if(x - 1 >= 0 && origin != LEFT && M[x - 1][y] != 0)
-			ptr->L = path(M, x - 1, y, row, col, RIGHT);
-
-		if(y - 1 >= 0 && origin != DOWN && M[x][y - 1] != 0)
-			ptr->D = path(M, x, y - 1, row, col, UP);
-
-		if(x + 1 < col && origin != RIGHT && M[x + 1][y] != 0)
-			ptr->R = path(M, x + 1, y, row, col, LEFT);
-
-		if(y + 1 < row && origin != UP && M[x][y + 1] != 0)
-			ptr->U = path(M, x, y + 1, row, col, DOWN);
-    }
-
-    return ptr;
-}
-
-int shortest_answer(int L, int D, int R, int U, int val)
-{
-	vector<int> tmp = {L,D,R,U};
-	int ans = INT32_MAX;
-
-	if (L <= 0 && D <= 0 && R <= 0 && U <= 0) 
-        return -1;
-	else 
-    {
-		for (auto i : tmp) 
+        for (int j = 0; j < V; j++)
         {
-			if (i > 0 && i < ans) 
-                ans = i;
-		}
-	}
-	return (ans > 0) ? val + ans : ans;
-}
-
-int shortest_path(Node* ptr)
-{
-    if (ptr == NULL) 
-        return 0;
-
-    if (ptr->value == -1)
-        return -1;
-    
-    if (ptr->L == NULL && ptr->D == NULL && ptr->R == NULL && ptr->U == NULL) 
-        return ptr->value;
-    
-    int L, D, R, U;   
-    for (int i = LEFT; i <= UP; i++)
-    {
-        switch(i)
-        {
-            case LEFT:
-                L = shortest_path(ptr->L);
-				break;
-            case DOWN:
-                D = shortest_path(ptr->D);
-				break;
-            case RIGHT:
-                R = shortest_path(ptr->R);
-				break;
-            case UP:
-                U = shortest_path(ptr->U);
-				break;
-            default:
-				cout << "ERROR" << endl;
-				break;
+            dis[i][j] = Matrix[i][j];
+            pos[i][j] = Position[i][j];
         }
     }
-    return shortest_answer(L, D, R, U, ptr->value);
 }
 
-int main(void) 
+//Compare the smallest node in the path
+bool choose_path(vector<int> orig_path, vector<int> new_path)
 {
-	int row, col, value, start_x, start_y;
-	
-    cin >> row >> col >> start_x >> start_y;
+    for (int i = 0; i < min(orig_path.size(), new_path.size()); i++)
+    {
+        if (orig_path[i] < new_path[i])
+            return false;
 
-	vector<int> empty_row;
-	vector<vector<int>> matrix;
-	Node* root;
+        else if (orig_path[i] > new_path[i])
+            return true;
+    }
 
-	for (int i = 0; i < col; i++)
-		matrix.push_back(empty_row);
+    if (orig_path.size() < new_path.size())
+        return false;
+    else
+        return true;
+}
 
-	for (int j = 0; j < row; j++)
-		for (int i = 0; i < col; i++) 
-		{
-			cin >> value;
-			matrix[i].push_back(value);
-		}
+//Floyd Warshall Algorithm
+void floyd_warshall(int V, vector<vector<vector<int>>> &path)
+{
+    for (int k = 0; k < V; k++)
+    {
+        for (int i = 0; i < V; i++)
+        {
+            for (int j = 0; j < V; j++)
+            {
+                if (dis[i][k] != INF && dis[k][j] != INF && i != j && i != k && j != k)
+                {
+                    if (dis[i][j] > dis[i][k] + dis[k][j])
+                    {
+                        dis[i][j] = dis[i][k] + dis[k][j];
+                        pos[i][j] = k;
 
-	root = path(matrix, start_x, start_y, row, col, CENTER);
-	cout << shortest_path(root) << endl;
-    
+                        path[i][j] = path[i][k];
+
+                        for (int l = 1; l < path[k][j].size(); l++)
+                        {
+                            path[i][j].push_back(path[k][j][l]);
+                        }
+                    }
+
+                    else if (dis[i][j] == dis[i][k] + dis[k][j])
+                    {
+                        vector<int> new_path;
+                        new_path = path[i][k];
+
+                        for (int l = 1; l < path[k][j].size(); l++)
+                        {
+                            new_path.push_back(path[k][j][l]);
+                        }
+
+                        if (choose_path(path[i][j], new_path))
+                        {
+                            path[i][j] = new_path;
+                            pos[i][j] = k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void print_path(int V, vector<vector<vector<int>>> &path)
+{
+    for (int i = 0; i < V; i++)
+    {
+        for (int j = 0; j < V; j++)
+        {
+            if (dis[i][j] != INF && i != j)
+            {
+                cout << "Path(" << i << "," << j << "):";
+
+                cout << path[i][j][0];
+
+                for (int k = 1; k < path[i][j].size(); k++)
+                {
+                    cout << "->" << path[i][j][k];
+                }
+                cout << endl;
+                cout << "Difficulty:" << dis[i][j] << endl;
+            }
+        }
+    }
+}
+
+void centrality(int V)
+{
+    for (int i = 0; i < V; i++)
+    {
+        double sum = 0.0;
+
+        for (int j = 0; j < V; j++)
+        {
+            if (i != j && dis[j][i] != INF)
+            {
+                sum += (1.0 / (dis[j][i]));
+            }
+        }
+        cout << "Centrality(" << i << "):" << fixed << setprecision(3) << sum << endl;
+    }
+}
+
+int main()
+{
+    int V, E;
+
+    vector<int> empty_row;
+    vector<vector<int>> empty_plane;
+
+    vector<vector<int>> matrix, position;
+    vector<vector<vector<int>>> path;
+
+    cin >> V;
+
+    //Insert data
+    for (int i = 0; i < V; i++)
+    {
+        matrix.push_back(empty_row);
+        position.push_back(empty_row);
+        path.push_back(empty_plane);
+
+        for (int j = 0; j < V; j++)
+        {
+            //Original
+            cin >> E;
+
+            if (i == j)
+                matrix[i].push_back(0);
+
+            else if (E == 0)
+                matrix[i].push_back(INF);
+
+            else
+                matrix[i].push_back(E);
+
+            //Position
+            position[i].push_back(-1);
+
+            //Path
+            path[i].push_back(empty_row);
+            path[i][j].push_back(i); //x
+            path[i][j].push_back(j); //y
+        }
+    }
+
+    //Initialize
+    initialize(V, matrix, position);
+
+    //Execution
+    floyd_warshall(V, path);
+
+    //Path & Difficulty
+    print_path(V, path);
+
+    //Centrality
+    centrality(V);
+
     return 0;
 }
